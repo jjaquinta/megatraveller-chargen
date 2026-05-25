@@ -68,7 +68,7 @@ function dispatch(character: Character, decision: Decision | undefined, rng: RNG
     case "reenlist":
       return handleReenlist(character, decision, rng);
     case "musterOut":
-      return handleMusterOut(character, decision);
+      return handleMusterOut(character, decision, rng);
     case "cascadeResolution":
       return handleCascadeResolution(character, decision);
     case "done":
@@ -88,7 +88,10 @@ export function newCharacter(seed: string): Character {
     termNumber: 0,
     pendingDecision: null,
     termScratch: null,
+    musterOutScratch: null,
     pendingCascades: [],
+    apparentAge: 18,
+    qualifyingTerms: 0,
   };
 
   return {

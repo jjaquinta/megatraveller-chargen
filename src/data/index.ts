@@ -66,15 +66,15 @@ export function validateData(): void {
         );
       }
     }
-    // Mustering-out tables should also have 6 entries.
-    if (career.musteringOut.benefits.length !== 6) {
+    // Mustering-out tables should have 7 entries (1-6 base + 7 reachable by DMs).
+    if (career.musteringOut.benefits.length !== 7) {
       throw new Error(
-        `Career "${career.id}" benefits table has ${career.musteringOut.benefits.length} entries; expected 6`,
+        `Career "${career.id}" benefits table has ${career.musteringOut.benefits.length} entries; expected 7`,
       );
     }
-    if (career.musteringOut.cash.length !== 6) {
+    if (career.musteringOut.cash.length !== 7) {
       throw new Error(
-        `Career "${career.id}" cash table has ${career.musteringOut.cash.length} entries; expected 6`,
+        `Career "${career.id}" cash table has ${career.musteringOut.cash.length} entries; expected 7`,
       );
     }
   }

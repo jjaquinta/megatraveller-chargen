@@ -1,18 +1,13 @@
 /**
- * Term phase: survival → commission → promotion → special duty → skills.
+ * Term phase: anagathics-choice → survival → commission → promotion →
+ * special duty → skills → aging → end-of-term.
  *
- * This handler is called many times during a term — each call advances by
- * the smallest possible step. State within the term lives in
- * character.generation.termScratch.
+ * Each call advances by the smallest possible step. Per-term scratch state
+ * lives in character.generation.termScratch.
  *
- * For Scouts (no commission, no promotion) the commission/promotion steps
- * short-circuit.
- *
- * Skills are handled by pausing for chooseSkillTable, rolling on the chosen
- * table, banking the result (incrementing the skill or its cascade parent),
- * and decrementing skillRollsRemaining. When skillRollsRemaining hits zero
- * the term concludes (aging then reenlist; for v1 we go straight to
- * reenlist).
+ * Order matters: anagathics declaration happens before survival because it
+ * modifies the survival DM. Aging happens after all term events (including
+ * skills) so failed aging saving throws can use Medical earned that term.
  */
 
 import { roll1d, roll2d } from "../dice";
@@ -31,6 +26,8 @@ import { eligibleSkillTables, getSkillTable } from "../rules/skillTables";
 import { getCareer } from "../../data";
 import { getSkill } from "../../data/skills";
 import { applyDelta } from "../upp";
+import { isAnagathicsEligible, offerAnagathics } from "./anagathics";
+import { handleAging } from "./aging";
 
 export function handleTerm(
   character: Character,
@@ -39,20 +36,25 @@ export function handleTerm(
 ): PhaseResult {
   if (!character.career) throw new Error("term with no career");
   const career = getCareer(character.career);
-  let scratch = character.generation.termScratch;
+  const scratch = character.generation.termScratch;
   if (!scratch) throw new Error("term phase with no scratch state");
 
-  // Step 1: survival. Resolved automatically (no decision required).
+  // Step 0: anagathics decision (term 4+, age 30+, not yet decided).
+  if (!scratch.anagathicsDecided && isAnagathicsEligible(character)) {
+    return offerAnagathics(character, decision, rng);
+  }
+
+  // Step 1: survival.
   if (!scratch.survived) {
     return rollSurvival(character, career, rng);
   }
 
-  // Step 2: commission (if eligible and not yet attempted).
+  // Step 2: commission.
   if (career.thresholds.commission !== null && !scratch.commissionAttempted && character.rank === 0) {
     return rollCommission(character, career, rng);
   }
 
-  // Step 3: promotion (if has rank and hasn't been promoted yet this term).
+  // Step 3: promotion.
   if (career.thresholds.promotion !== null && character.rank > 0 && !scratch.promoted) {
     return rollPromotion(character, career, rng);
   }
@@ -62,54 +64,110 @@ export function handleTerm(
     return rollSpecialDuty(character, career, rng);
   }
 
-  // Step 5: skills. May pause for chooseSkillTable.
+  // Step 5: skills (may pause for chooseSkillTable).
   if (scratch.skillRollsRemaining > 0) {
     return handleSkillRoll(character, career, decision, rng);
   }
 
-  // Term complete. Advance to reenlist.
-  const aged = appendLog({ ...character, age: character.age + 4 }, `End of term ${character.generation.termNumber}; age ${character.age + 4}.`);
+  // Step 6: aging. Apparent age advances by 4 at end of term *unless* on
+  // anagathics with a supply (after the first term of using). v1 implements
+  // the simple rule: anagathics with supply freezes apparent age; without
+  // supply (or first term on anagathics), apparent age advances normally.
+  if (!scratch.agingResolved) {
+    // Advance ages first.
+    const actualNewAge = character.age + 4;
+    let apparentNewAge = character.generation.apparentAge + 4;
+    if (character.anagathics.using && character.anagathics.hasSupply && character.anagathics.apparentAge !== null
+        && character.anagathics.apparentAge !== character.generation.apparentAge) {
+      // We've already used anagathics for at least one term, and supply is
+      // maintained: hold apparent age. (apparentAge was set during the first
+      // anagathics term to the then-current apparent age.)
+      apparentNewAge = character.anagathics.apparentAge;
+    }
+    // First-anagathics-term tracking: if using and hasSupply but apparentAge
+    // hasn't been set yet, lock it now (to the *new* apparent age — first
+    // term still advances per the book).
+    let nextAnagatStateApparent = character.anagathics.apparentAge;
+    if (character.anagathics.using && character.anagathics.hasSupply && nextAnagatStateApparent === null) {
+      nextAnagatStateApparent = apparentNewAge;
+    }
+
+    let aged: Character = {
+      ...character,
+      age: actualNewAge,
+      generation: {
+        ...character.generation,
+        apparentAge: apparentNewAge,
+      },
+      anagathics: { ...character.anagathics, apparentAge: nextAnagatStateApparent },
+    };
+    aged = appendLog(
+      aged,
+      character.anagathics.using
+        ? `End of term ${character.generation.termNumber}; age ${actualNewAge} (apparent ${apparentNewAge}).`
+        : `End of term ${character.generation.termNumber}; age ${actualNewAge}.`,
+    );
+
+    // Run aging if apparent age has crossed 34. The aging phase itself
+    // handles its no-op case if apparent age < 34.
+    return handleAging(aged, undefined, rng);
+  }
+
+  // Step 7: end of term — increment terms, transition to reenlist.
+  // qualifyingTerms (for muster-out budget) doesn't count anagathics terms.
+  const qualifyingTerms =
+    character.generation.qualifyingTerms + (scratch.anagathicsChosen ? 0 : 1);
+
   return {
     kind: "continue",
     character: {
-      ...aged,
-      terms: aged.generation.termNumber,
+      ...character,
+      terms: character.generation.termNumber,
       generation: {
-        ...aged.generation,
+        ...character.generation,
         phase: "reenlist",
         pendingDecision: null,
         termScratch: null,
+        qualifyingTerms,
       },
     },
   };
 }
 
 function rollSurvival(character: Character, career: CareerDef, rng: RNG): PhaseResult {
-  const dms = evaluateDMs(career.thresholds.survival.dms, character);
+  let dms = evaluateDMs(career.thresholds.survival.dms, character);
+  // Anagathics survival DM: -1 (or -2 for nobles)
+  if (character.generation.termScratch?.anagathicsChosen) {
+    dms += career.anagathicsSurvivalDm;
+  }
+  // Belter survival DM rule
+  if (career.thresholds.survival.specialDmRule === "belterTerms") {
+    dms += character.generation.termNumber;
+  }
+
   const roll = roll2d(rng, dms);
   const survived = roll.effective >= career.thresholds.survival.target;
-  const scratch: TermScratch = { ...character.generation.termScratch!, survived };
+  const newScratch: TermScratch = { ...character.generation.termScratch!, survived };
+  const dmStr = formatDM(dms);
 
   if (survived) {
     const updated = appendLog(
       character,
-      `Survived term ${character.generation.termNumber} (rolled ${roll.total}${dms ? `+${dms}` : ""} vs ${career.thresholds.survival.target}+).`,
+      `Survived term ${character.generation.termNumber} (rolled ${roll.total}${dmStr} vs ${career.thresholds.survival.target}+).`,
     );
     return {
       kind: "continue",
       character: {
         ...updated,
-        generation: { ...updated.generation, termScratch: scratch },
+        generation: { ...updated.generation, termScratch: newScratch },
       },
     };
   }
 
-  // Failed survival: optional rule says death; default rule says mustered out
-  // after two years. We take the default. Term doesn't count for benefits, so
-  // we don't bump terms. Bump age by 2 instead of 4. Go to musterOut.
+  // Failed survival: mustered out after two years. Half-term doesn't count.
   const updated = appendLog(
-    { ...character, age: character.age + 2 },
-    `Failed survival in term ${character.generation.termNumber}. Mustered out early.`,
+    { ...character, age: character.age + 2, generation: { ...character.generation, apparentAge: character.generation.apparentAge + 2 } },
+    `Failed survival in term ${character.generation.termNumber} (rolled ${roll.total}${dmStr} vs ${career.thresholds.survival.target}+). Mustered out early.`,
   );
   return {
     kind: "continue",
@@ -130,23 +188,23 @@ function rollCommission(character: Character, career: CareerDef, rng: RNG): Phas
   const dms = evaluateDMs(t.dms, character);
   const roll = roll2d(rng, dms);
   const success = roll.effective >= t.target;
-  const scratch: TermScratch = {
-    ...character.generation.termScratch!,
+  const oldScratch = character.generation.termScratch!;
+  const newScratch: TermScratch = {
+    ...oldScratch,
     commissionAttempted: true,
     commissioned: success,
-    skillRollsRemaining: character.generation.termScratch!.skillRollsRemaining + (success ? 1 : 0),
+    skillRollsRemaining: oldScratch.skillRollsRemaining + (success ? 1 : 0),
   };
+  const dmStr = formatDM(dms);
   const updated = appendLog(
+    success ? { ...character, rank: 1 } : character,
     success
-      ? { ...character, rank: 1 }
-      : character,
-    success
-      ? `Commissioned (rolled ${roll.total}${dms ? `+${dms}` : ""} vs ${t.target}+).`
-      : `Failed commission (rolled ${roll.total}${dms ? `+${dms}` : ""} vs ${t.target}+).`,
+      ? `Commissioned (rolled ${roll.total}${dmStr} vs ${t.target}+).`
+      : `Failed commission (rolled ${roll.total}${dmStr} vs ${t.target}+).`,
   );
   return {
     kind: "continue",
-    character: { ...updated, generation: { ...updated.generation, termScratch: scratch } },
+    character: { ...updated, generation: { ...updated.generation, termScratch: newScratch } },
   };
 }
 
@@ -156,20 +214,22 @@ function rollPromotion(character: Character, career: CareerDef, rng: RNG): Phase
   const roll = roll2d(rng, dms);
   const success = roll.effective >= t.target;
   const newRank = success ? Math.min(character.rank + 1, career.ranks.length) : character.rank;
-  const scratch: TermScratch = {
-    ...character.generation.termScratch!,
+  const oldScratch = character.generation.termScratch!;
+  const newScratch: TermScratch = {
+    ...oldScratch,
     promoted: true,
-    skillRollsRemaining: character.generation.termScratch!.skillRollsRemaining + (success ? 1 : 0),
+    skillRollsRemaining: oldScratch.skillRollsRemaining + (success ? 1 : 0),
   };
+  const dmStr = formatDM(dms);
   const updated = appendLog(
     success ? { ...character, rank: newRank } : character,
     success
-      ? `Promoted to rank ${newRank} (rolled ${roll.total}${dms ? `+${dms}` : ""} vs ${t.target}+).`
-      : `Did not promote (rolled ${roll.total}${dms ? `+${dms}` : ""} vs ${t.target}+).`,
+      ? `Promoted to rank ${newRank} (rolled ${roll.total}${dmStr} vs ${t.target}+).`
+      : `Did not promote (rolled ${roll.total}${dmStr} vs ${t.target}+).`,
   );
   return {
     kind: "continue",
-    character: { ...updated, generation: { ...updated.generation, termScratch: scratch } },
+    character: { ...updated, generation: { ...updated.generation, termScratch: newScratch } },
   };
 }
 
@@ -178,20 +238,22 @@ function rollSpecialDuty(character: Character, career: CareerDef, rng: RNG): Pha
   const dms = evaluateDMs(t.dms, character);
   const roll = roll2d(rng, dms);
   const success = roll.effective >= t.target;
-  const scratch: TermScratch = {
-    ...character.generation.termScratch!,
+  const oldScratch = character.generation.termScratch!;
+  const newScratch: TermScratch = {
+    ...oldScratch,
     specialDuty: true,
-    skillRollsRemaining: character.generation.termScratch!.skillRollsRemaining + (success ? 1 : 0),
+    skillRollsRemaining: oldScratch.skillRollsRemaining + (success ? 1 : 0),
   };
+  const dmStr = formatDM(dms);
   const updated = appendLog(
     character,
     success
-      ? `Special duty earned (+1 skill) (rolled ${roll.total}${dms ? `+${dms}` : ""} vs ${t.target}+).`
-      : `No special duty (rolled ${roll.total}${dms ? `+${dms}` : ""} vs ${t.target}+).`,
+      ? `Special duty earned (+1 skill) (rolled ${roll.total}${dmStr} vs ${t.target}+).`
+      : `No special duty (rolled ${roll.total}${dmStr} vs ${t.target}+).`,
   );
   return {
     kind: "continue",
-    character: { ...updated, generation: { ...updated.generation, termScratch: scratch } },
+    character: { ...updated, generation: { ...updated.generation, termScratch: newScratch } },
   };
 }
 
@@ -201,7 +263,6 @@ function handleSkillRoll(
   decision: Decision | undefined,
   rng: RNG,
 ): PhaseResult {
-  // If we're waiting for a table choice, ask for it.
   if (character.generation.pendingDecision === null) {
     const allowed = eligibleSkillTables(career, character);
     const request: DecisionRequest = {
@@ -228,14 +289,13 @@ function handleSkillRoll(
   const entry = table.entries.find((e) => e.roll === die);
   if (!entry) throw new Error(`Skill table ${decision.tableId} has no entry for roll ${die}`);
 
-  // Apply the skill: either a stat bump or a skill increment.
   let updated = character;
   if (entry.statBump) {
-    updated = {
-      ...updated,
-      upp: applyDelta(updated.upp, entry.statBump, 1),
-    };
-    updated = appendLog(updated, `Studied on the ${table.name} table (rolled ${die}): +1 ${entry.statBump}.`);
+    updated = { ...updated, upp: applyDelta(updated.upp, entry.statBump, 1) };
+    updated = appendLog(
+      updated,
+      `Studied on the ${table.name} table (rolled ${die}): +1 ${entry.statBump}.`,
+    );
   } else {
     const skill = getSkill(entry.skillId);
     const current = updated.skills.get(skill.id) ?? 0;
@@ -243,7 +303,6 @@ function handleSkillRoll(
     newSkills.set(skill.id, current + 1);
     updated = { ...updated, skills: newSkills };
     if (skill.isCascade) {
-      // Track as a pending cascade so it gets resolved at end of gen if not earlier.
       const pending = updated.generation.pendingCascades.includes(skill.id)
         ? updated.generation.pendingCascades
         : [...updated.generation.pendingCascades, skill.id];
@@ -251,9 +310,15 @@ function handleSkillRoll(
         ...updated,
         generation: { ...updated.generation, pendingCascades: pending },
       };
-      updated = appendLog(updated, `Studied on the ${table.name} table (rolled ${die}): banked ${skill.name} (to resolve later).`);
+      updated = appendLog(
+        updated,
+        `Studied on the ${table.name} table (rolled ${die}): banked ${skill.name} (to resolve later).`,
+      );
     } else {
-      updated = appendLog(updated, `Studied on the ${table.name} table (rolled ${die}): ${skill.name}-${current + 1}.`);
+      updated = appendLog(
+        updated,
+        `Studied on the ${table.name} table (rolled ${die}): ${skill.name}-${current + 1}.`,
+      );
     }
   }
 
@@ -265,11 +330,13 @@ function handleSkillRoll(
       generation: {
         ...updated.generation,
         pendingDecision: null,
-        termScratch: {
-          ...scratch,
-          skillRollsRemaining: scratch.skillRollsRemaining - 1,
-        },
+        termScratch: { ...scratch, skillRollsRemaining: scratch.skillRollsRemaining - 1 },
       },
     },
   };
+}
+
+function formatDM(dms: number): string {
+  if (dms === 0) return "";
+  return dms > 0 ? `+${dms}` : `${dms}`;
 }

@@ -128,5 +128,8 @@ export function freshTermScratch(
     promoted: false,
     specialDuty: false,
     skillRollsRemaining: skillRolls,
+    anagathicsChosen: false,
+    anagathicsDecided: false,
+    agingResolved: false,
   };
 }

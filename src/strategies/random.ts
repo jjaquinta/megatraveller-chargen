@@ -59,7 +59,6 @@ export class RandomStrategy implements Strategy {
           return { kind: "resolveCascade", choice: { kind: "defer" } };
         }
         if (request.options.length === 0) {
-          // Forced resolution with no options means something is wrong with the data.
           throw new Error(`Cascade ${request.parent} has no options to resolve to`);
         }
         return {
@@ -67,12 +66,38 @@ export class RandomStrategy implements Strategy {
           choice: { kind: "specific", child: pick(request.options, this.rng) },
         };
       }
+      case "anagathicsUse":
+        // 30% chance to start taking anagathics; if already using, 70% chance to continue.
+        return {
+          kind: "anagathicsUse",
+          use: request.currentlyUsing ? this.rng.next() < 0.7 : this.rng.next() < 0.3,
+        };
       case "reenlist":
         return { kind: "reenlist", reenlist: this.rng.next() < 0.5 };
       case "musterOutTableChoice": {
-        const useCash = request.cashRollsUsed < request.cashLimit && this.rng.next() < 0.5;
+        const canCash = request.cashRollsUsed < request.cashLimit;
+        const useCash = canCash && this.rng.next() < 0.5;
         return { kind: "musterOutTableChoice", table: useCash ? "cash" : "benefits" };
       }
+      case "chooseWeapon": {
+        // 50/50 between new weapon and stacking one we already own (when possible).
+        if (request.alreadyOwned.length > 0 && this.rng.next() < 0.5) {
+          return {
+            kind: "chooseWeapon",
+            choice: { kind: "stack", weapon: pick(request.alreadyOwned, this.rng) },
+          };
+        }
+        return {
+          kind: "chooseWeapon",
+          choice: { kind: "new", weapon: pick(request.availableWeapons, this.rng) },
+        };
+      }
+      case "agingSavedCharacteristics":
+        // Pick the first `count` options.
+        return {
+          kind: "agingSavedCharacteristics",
+          chosen: request.options.slice(0, request.count),
+        };
     }
   }
 }

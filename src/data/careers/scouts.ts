@@ -93,15 +93,18 @@ export const SCOUTS: CareerDef = {
   ],
   musteringOut: {
     // Scout Mustering Out — Benefits and Cash tables.
-    // From the book: Scout benefits give Low/Mid passages, weapons, +2 Edu,
-    // a Scout Ship; cash table is modest.
+    // Both tables have 7 entries: roll 1-6 base, 7 reached only when the
+    // character has rank 5/6 (+1 benefit DM) or +1 cash DM (Gambling/retired).
+    // Scouts have no rank, so they never reach 7 on benefits; they can still
+    // reach 7 on cash if they have Gambling-1+.
     benefits: [
       { roll: 1, benefit: { kind: "lowPassage" } },
-      { roll: 2, benefit: { kind: "object", objectId: "instrument" } },
-      { roll: 3, benefit: { kind: "weapon" } },
+      { roll: 2, benefit: { kind: "statBump", stat: "Int", amount: 2 } },
+      { roll: 3, benefit: { kind: "statBump", stat: "Edu", amount: 2 } },
       { roll: 4, benefit: { kind: "weapon" } },
-      { roll: 5, benefit: { kind: "statBump", stat: "Edu", amount: 2 } },
+      { roll: 5, benefit: { kind: "weapon" } },
       { roll: 6, benefit: { kind: "object", objectId: "scoutShip" } },
+      { roll: 7, benefit: { kind: "none" } },
     ],
     cash: [
       { roll: 1, credits: 20000 },
@@ -110,6 +113,7 @@ export const SCOUTS: CareerDef = {
       { roll: 4, credits: 30000 },
       { roll: 5, credits: 50000 },
       { roll: 6, credits: 50000 },
+      { roll: 7, credits: 50000 },
     ],
   },
   skillsPerInitialTerm: 2,

@@ -138,16 +138,18 @@ export interface HomeworldRestriction {
 }
 
 /**
- * Mustering-out tables. Each table has six entries indexed by 1D.
- * Benefit entries describe what is gained; Cash entries describe credits.
+ * Mustering-out tables. Each table has six entries indexed by 1D, plus an
+ * optional 7th entry that becomes reachable when the character has rank 5+
+ * (which grants +1 to benefit rolls) or +1 cash DM from Gambling/Prospecting
+ * or retirement.
  */
 export interface BenefitEntry {
-  roll: number;
+  roll: number; // 1-7; 7 is the rank-5/6 bonus row
   benefit: BenefitOutcome;
 }
 
 export interface CashEntry {
-  roll: number;
+  roll: number; // 1-7
   credits: number;
 }
 
@@ -158,7 +160,8 @@ export type BenefitOutcome =
   | { kind: "statBump"; stat: CharacteristicName; amount: number }
   | { kind: "weapon" }
   | { kind: "tasMembership" }
-  | { kind: "object"; objectId: string }; // catalog lookup
+  | { kind: "object"; objectId: string } // catalog lookup
+  | { kind: "none" }; // for the Scout row 7 ("—")
 
 export interface CareerDef {
   id: CareerId;
@@ -224,6 +227,13 @@ export type DecisionRequest =
       currentLevels: Record<SkillId, number>;
     }
   | {
+      kind: "anagathicsUse";
+      currentlyUsing: boolean;
+      hasSupply: boolean;
+      apparentAge: number;
+      actualAge: number;
+    }
+  | {
       kind: "reenlist";
       mandatoryIfRolled12: true;
       mayChoose: boolean; // false on mandatory; true otherwise
@@ -233,6 +243,19 @@ export type DecisionRequest =
       remainingRolls: number;
       cashRollsUsed: number;
       cashLimit: number;
+    }
+  | {
+      kind: "chooseWeapon";
+      /** When mustering-out grants a weapon, the player picks any in-tech, in-law one. */
+      availableWeapons: SkillId[];
+      /** Weapons already received as benefits — the player can stack skill in those. */
+      alreadyOwned: SkillId[];
+    }
+  | {
+      kind: "agingSavedCharacteristics";
+      /** When on anagathics, pick which characteristics auto-save. Two for normal lines; for age 66+ still two. */
+      options: CharacteristicName[];
+      count: number;
     };
 
 export type Decision =
@@ -241,8 +264,11 @@ export type Decision =
   | { kind: "acceptDraft"; accept: boolean }
   | { kind: "chooseSkillTable"; tableId: SkillTableId }
   | { kind: "resolveCascade"; choice: { kind: "specific"; child: SkillId } | { kind: "defer" } }
+  | { kind: "anagathicsUse"; use: boolean }
   | { kind: "reenlist"; reenlist: boolean }
-  | { kind: "musterOutTableChoice"; table: "benefits" | "cash" };
+  | { kind: "musterOutTableChoice"; table: "benefits" | "cash" }
+  | { kind: "chooseWeapon"; choice: { kind: "new"; weapon: SkillId } | { kind: "stack"; weapon: SkillId } }
+  | { kind: "agingSavedCharacteristics"; chosen: CharacteristicName[] };
 
 // ============================================================================
 // Engine result
@@ -336,8 +362,17 @@ export interface GenerationState {
    */
   termScratch: TermScratch | null;
 
+  /** Scratch state during mustering out — sequence of benefit/cash rolls. */
+  musterOutScratch: MusterOutScratch | null;
+
   /** Cumulative pending cascade resolutions, swept at end of generation. */
   pendingCascades: SkillId[];
+
+  /** Apparent age (Aging Table line) tracked separately for anagathics. */
+  apparentAge: number;
+
+  /** Term count that contributes to retirement / muster-out roll budget (anagathics terms excluded). */
+  qualifyingTerms: number;
 }
 
 export interface TermScratch {
@@ -350,6 +385,28 @@ export interface TermScratch {
   specialDuty: boolean;
   /** Skill rolls earned this term but not yet rolled. */
   skillRollsRemaining: number;
+  /** Whether the player chose to take anagathics this term (queried before survival). */
+  anagathicsChosen: boolean;
+  /** Whether anagathics was offered/decided this term. */
+  anagathicsDecided: boolean;
+  /** Whether aging has been processed for this term. */
+  agingResolved: boolean;
+}
+
+export interface MusterOutScratch {
+  totalRolls: number;
+  rollsUsed: number;
+  cashRollsUsed: number;
+  cashLimit: 2 | 3;
+  /** +1 to benefits if rank 5/6; +1 to cash if Gambling-1+/Prospecting-1+/retired. */
+  benefitDM: number;
+  cashDM: number;
+  /** Weapons received so far (so the next "weapon" benefit can stack). */
+  weaponsReceived: SkillId[];
+  /** Whether TAS membership already received (only once). */
+  tasReceived: boolean;
+  /** Whether scout ship already received (only once per book). */
+  scoutShipReceived: boolean;
 }
 
 // ============================================================================
