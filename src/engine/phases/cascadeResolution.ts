@@ -127,7 +127,12 @@ function applyResolveCascade(character: Character, decision: Decision): PhaseRes
   const count = character.skills.get(parent) ?? 0;
 
   let updated = character;
-  if (STAT_BUMP_CASCADES[parent]) {
+  // A child is a stat bump if either (a) the parent is one of the
+  // pure stat-bump cascades (Physical/Mental/Inborn — where every option is
+  // a stat) or (b) the chosen child name itself is a characteristic.
+  const charNames: readonly string[] = ["Str", "Dex", "End", "Int", "Edu", "Soc"];
+  const isStatChild = !!STAT_BUMP_CASCADES[parent] || charNames.includes(child);
+  if (isStatChild) {
     const stat = child as unknown as CharacteristicName;
     updated = { ...updated, upp: applyDelta(updated.upp, stat, count) };
     updated = appendLog(updated, `Resolved ${parent} (${count}): +${count} ${stat}.`);

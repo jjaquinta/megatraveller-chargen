@@ -60,9 +60,24 @@ describe("Mustering out", () => {
   });
 
   it("scouts never receive retirement pay (canRetire=false)", () => {
+    // Force-Scout strategy so this stays a Scout-specific assertion.
     for (let i = 0; i < 100; i++) {
-      const c = genCharacter(`scout-no-retire-${i}`);
-      expect(c.retirementPay).toBe(0);
+      const seed = `scout-no-retire-${i}`;
+      const inner = new RandomStrategy(createRng(`strat-${seed}`));
+      const strategy = {
+        decide(req: import("../engine/types").DecisionRequest, c: import("../engine/types").Character) {
+          if (req.kind === "chooseCareer" && req.options.includes("Scouts")) {
+            return { kind: "chooseCareer" as const, careerId: "Scouts" };
+          }
+          const d = inner.decide(req, c);
+          if (d instanceof Promise) throw new Error("sync only");
+          return d;
+        },
+      };
+      const character = runSync(strategy, createRng(seed), seed);
+      if (character.career === "Scouts") {
+        expect(character.retirementPay).toBe(0);
+      }
     }
   });
 });

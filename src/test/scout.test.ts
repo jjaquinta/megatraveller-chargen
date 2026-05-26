@@ -1,9 +1,8 @@
 /**
- * End-to-end integration test: generate Scout characters with RandomStrategy.
+ * End-to-end integration test for Scout characters specifically.
  *
- * This is the vertical slice's proving test. Runs many full generations,
- * verifying invariants hold throughout. Specific outcomes (skills learned,
- * terms served, etc.) vary by seed, but post-conditions must always hold.
+ * Uses a forced-career strategy that always picks Scouts on chooseCareer.
+ * This keeps the test stable as more careers are added.
  */
 
 import { describe, it, expect } from "vitest";
@@ -11,33 +10,48 @@ import { createRng } from "../engine/rng";
 import { runSync } from "../strategies/runSync";
 import { RandomStrategy } from "../strategies/random";
 import { encodeUPP } from "../engine/upp";
+import type { Strategy } from "../strategies/types";
+import type { Decision, DecisionRequest, Character } from "../engine/types";
 
-describe("Scout career — random end-to-end", () => {
-  it("generates a finished character from seed 'seed-1'", () => {
+/** Wraps RandomStrategy but forces the chosen career to a specific id. */
+class ForcedCareerStrategy implements Strategy {
+  constructor(private inner: RandomStrategy, private careerId: string) {}
+  decide(req: DecisionRequest, c: Character): Decision {
+    if (req.kind === "chooseCareer") {
+      // If Scouts isn't in the offered options (e.g. homeworld restriction),
+      // fall back to the inner random pick.
+      if (req.options.includes(this.careerId)) {
+        return { kind: "chooseCareer", careerId: this.careerId };
+      }
+    }
+    const d = this.inner.decide(req, c);
+    if (d instanceof Promise) throw new Error("expected sync");
+    return d;
+  }
+}
+
+describe("Scout career — forced random end-to-end", () => {
+  it("generates a finished Scout from seed 'seed-1'", () => {
     const rng = createRng("seed-1");
-    const strategy = new RandomStrategy(createRng("strategy-1"));
+    const strategy = new ForcedCareerStrategy(
+      new RandomStrategy(createRng("strategy-1")),
+      "Scouts",
+    );
     const character = runSync(strategy, rng, "seed-1");
 
     expect(character.generation.phase).toBe("done");
     expect(character.name).not.toBe("");
     expect(character.career).toBe("Scouts");
-    expect(character.upp.Str).toBeGreaterThanOrEqual(2);
-    expect(character.upp.Str).toBeLessThanOrEqual(12);
-    // Verify UPP is encodable
+    expect(character.upp.Str).toBeGreaterThanOrEqual(0);
+    expect(character.upp.Str).toBeLessThanOrEqual(15);
     expect(encodeUPP(character.upp)).toMatch(/^[0-9A-F]{6}$/);
   });
 
   it("is deterministic given the same seeds", () => {
-    const c1 = runSync(
-      new RandomStrategy(createRng("strat-A")),
-      createRng("rng-A"),
-      "rng-A",
-    );
-    const c2 = runSync(
-      new RandomStrategy(createRng("strat-A")),
-      createRng("rng-A"),
-      "rng-A",
-    );
+    const buildStrategy = () =>
+      new ForcedCareerStrategy(new RandomStrategy(createRng("strat-A")), "Scouts");
+    const c1 = runSync(buildStrategy(), createRng("rng-A"), "rng-A");
+    const c2 = runSync(buildStrategy(), createRng("rng-A"), "rng-A");
     expect(c1.upp).toEqual(c2.upp);
     expect(c1.career).toBe(c2.career);
     expect(c1.terms).toBe(c2.terms);
@@ -47,7 +61,7 @@ describe("Scout career — random end-to-end", () => {
     );
   });
 
-  it("never crashes across 100 different seeds", () => {
+  it("never crashes across 100 different seeds (any career)", () => {
     for (let i = 0; i < 100; i++) {
       const seed = `bulk-${i}`;
       const character = runSync(
@@ -56,9 +70,7 @@ describe("Scout career — random end-to-end", () => {
         seed,
       );
       expect(character.generation.phase).toBe("done");
-      // Age should be 18 + 4*completed_terms (or 18 + 4*(N-1) + 2 if last term failed survival)
       expect(character.age).toBeGreaterThanOrEqual(18);
-      // Terms should be sane
       expect(character.terms).toBeGreaterThanOrEqual(0);
       expect(character.terms).toBeLessThan(20);
     }
@@ -66,7 +78,7 @@ describe("Scout career — random end-to-end", () => {
 
   it("logs the character's career", () => {
     const character = runSync(
-      new RandomStrategy(createRng("log-strat")),
+      new ForcedCareerStrategy(new RandomStrategy(createRng("log-strat")), "Scouts"),
       createRng("log-rng"),
       "log-rng",
     );

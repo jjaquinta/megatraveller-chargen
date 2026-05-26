@@ -84,7 +84,6 @@ const skills: SkillDef[] = [
   { id: "HeavyWeapons", name: "Heavy Weapons", isCascade: false },
   { id: "BattleDress", name: "Battle Dress", isCascade: false, minTechLevel: 13 },
   { id: "CombatEngineering", name: "Combat Engineering", isCascade: false },
-  { id: "Academic", name: "Academic", isCascade: false },
   { id: "NavalArchitect", name: "Naval Architect", isCascade: false },
   { id: "Gunnery", name: "Gunnery", isCascade: false },
   { id: "SpaceTech", name: "Space Tech", isCascade: false },
@@ -92,6 +91,30 @@ const skills: SkillDef[] = [
   { id: "Biology", name: "Biology", isCascade: false },
   { id: "Gravitics", name: "Gravitics", isCascade: false },
   { id: "ATV", name: "ATV", isCascade: false },
+
+  // ----- New plain skills referenced in slice 3 careers -----
+  { id: "Forensic", name: "Forensic", isCascade: false },
+  { id: "Legal", name: "Legal", isCascade: false },
+  { id: "Interview", name: "Interview", isCascade: false },
+  { id: "ShipTactics", name: "Ship Tactics", isCascade: false },
+  { id: "WheeledVehicle", name: "Wheeled Vehicle", isCascade: false },
+  { id: "Broker", name: "Broker", isCascade: false },
+  { id: "AnimalHandling", name: "Animal Handling", isCascade: false },
+  { id: "History", name: "History", isCascade: false },
+  { id: "Persuasion", name: "Persuasion", isCascade: false },
+  { id: "Chemistry", name: "Chemistry", isCascade: false },
+  { id: "Genetics", name: "Genetics", isCascade: false },
+  { id: "Physics", name: "Physics", isCascade: false },
+  { id: "Robotics", name: "Robotics", isCascade: false },
+  { id: "Bow", name: "Bow", isCascade: false },
+  { id: "Sling", name: "Sling", isCascade: false },
+  { id: "Blowgun", name: "Blowgun", isCascade: false },
+  { id: "Bola", name: "Bola", isCascade: false },
+  { id: "Boomerang", name: "Boomerang", isCascade: false },
+  { id: "EarlyFirearms", name: "Early Firearms", isCascade: false },
+  { id: "Broadsword", name: "Broadsword", isCascade: false },
+  { id: "Cutlass", name: "Cutlass", isCascade: false },
+  { id: "TrackedVehicle", name: "Tracked Vehicle", isCascade: false },
 
   // ----- Cascade parents -----
   // Personal Development / Service Skills tables use these umbrella names;
@@ -143,13 +166,13 @@ const skills: SkillDef[] = [
     id: "Vehicle",
     name: "Vehicle",
     isCascade: true,
-    cascadeOptions: ["GravVehicle", "ATV"],
+    cascadeOptions: ["GravVehicle", "ATV", "WheeledVehicle", "TrackedVehicle"],
   },
   {
     id: "SpaceCombat",
     name: "Space Combat",
     isCascade: true,
-    cascadeOptions: ["Gunnery", "ShipsBoat"],
+    cascadeOptions: ["Gunnery", "ShipsBoat", "ShipTactics"],
   },
   {
     id: "Space",
@@ -174,6 +197,71 @@ const skills: SkillDef[] = [
     name: "Special Combat",
     isCascade: true,
     cascadeOptions: ["HeavyWeapons", "BattleDress"],
+  },
+
+  // Slice 3: additional cascades for the broader career mix.
+  {
+    id: "Environ",
+    name: "Environ",
+    isCascade: true,
+    cascadeOptions: ["AnimalHandling", "ArchaicWeapons", "Hunting", "Recon", "Survival", "Stealth"],
+  },
+  {
+    id: "Economic",
+    name: "Economic",
+    isCascade: true,
+    cascadeOptions: ["Admin", "Broker", "Legal", "Trader"],
+  },
+  {
+    id: "Science",
+    name: "Science",
+    isCascade: true,
+    cascadeOptions: ["Biology", "Chemistry", "Genetics", "Forensic", "Medical", "Physics", "Robotics"],
+  },
+  {
+    id: "Exploratory",
+    name: "Exploratory",
+    isCascade: true,
+    cascadeOptions: ["Pilot", "SensorOps", "Survey", "Survival", "VaccSuit", "Vehicle"],
+  },
+  {
+    id: "Academic",
+    name: "Academic",
+    isCascade: true,
+    // The book lists "+1 Edu" as one of the options. We model that by
+    // including "Edu" in the cascade options; cascadeResolution treats any
+    // characteristic name as a stat bump (same path as Mental / Inborn).
+    cascadeOptions: ["Admin", "History", "Linguistics", "Persuasion", "Science", "Edu"],
+  },
+  {
+    id: "ArchaicWeapons",
+    name: "Archaic Weapons",
+    isCascade: true,
+    cascadeOptions: ["Blowgun", "Bola", "Boomerang", "Bow", "Crossbow", "EarlyFirearms", "Sling"],
+  },
+  {
+    id: "LargeBlade",
+    name: "Large Blade",
+    isCascade: true,
+    cascadeOptions: ["Broadsword", "Cutlass", "Sword"],
+  },
+  {
+    id: "Aircraft",
+    name: "Aircraft",
+    isCascade: true,
+    cascadeOptions: [],
+  },
+  {
+    id: "SmallWatercraft",
+    name: "Small Watercraft",
+    isCascade: true,
+    cascadeOptions: [],
+  },
+  {
+    id: "LargeWatercraft",
+    name: "Large Watercraft",
+    isCascade: true,
+    cascadeOptions: [],
   },
 ];
 

@@ -118,6 +118,29 @@ export function handleReenlist(
     };
   }
 
+  // Success: either ask the player (default) or force reenlistment
+  // (Bureaucrats: mandatoryReenlistOnSuccess).
+  if (career.mandatoryReenlistOnSuccess) {
+    const next = character.generation.termNumber + 1;
+    const updated = appendLog(
+      character,
+      `Reenlistment successful (rolled ${roll.total}${dms ? `+${dms}` : ""} vs ${t.target}+). Bureaucracy requires another term — entering term ${next}.`,
+    );
+    return {
+      kind: "continue",
+      character: {
+        ...updated,
+        generation: {
+          ...updated.generation,
+          phase: "term",
+          pendingDecision: null,
+          termNumber: next,
+          termScratch: freshTermScratch(career, /*isInitialTerm*/ false),
+        },
+      },
+    };
+  }
+
   // Success and not mandatory: ask the player.
   const request: DecisionRequest = {
     kind: "reenlist",

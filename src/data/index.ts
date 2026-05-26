@@ -9,8 +9,32 @@
 import type { CareerDef, CareerId } from "../engine/types";
 import { SKILL_REGISTRY, allSkills } from "./skills";
 import { SCOUTS } from "./careers/scouts";
+import { NAVY } from "./careers/navy";
+import { MARINES } from "./careers/marines";
+import { ARMY } from "./careers/army";
+import { FLYER } from "./careers/flyer";
+import { SAILOR } from "./careers/sailor";
+import { LAW_ENFORCER } from "./careers/lawEnforcer";
+import { DOCTOR } from "./careers/doctor";
+import { DIPLOMAT } from "./careers/diplomat";
+import { BUREAUCRAT } from "./careers/bureaucrat";
+import { SCIENTIST } from "./careers/scientist";
+import { NOBLE } from "./careers/noble";
+import { MERCHANT } from "./careers/merchant";
+import { BELTER } from "./careers/belter";
+import { PIRATE } from "./careers/pirate";
+import { ROGUE } from "./careers/rogue";
+import { HUNTER } from "./careers/hunter";
+import { BARBARIAN } from "./careers/barbarian";
 
-const careers: CareerDef[] = [SCOUTS];
+const careers: CareerDef[] = [
+  // Military
+  NAVY, MARINES, ARMY, SCOUTS, FLYER, SAILOR,
+  // Civilian-professional
+  LAW_ENFORCER, DOCTOR, DIPLOMAT, BUREAUCRAT, SCIENTIST, NOBLE,
+  // Roguish / frontier
+  MERCHANT, BELTER, PIRATE, ROGUE, HUNTER, BARBARIAN,
+];
 
 export const CAREER_REGISTRY: ReadonlyMap<CareerId, CareerDef> = new Map(
   careers.map((c) => [c.id, c]),
@@ -44,11 +68,13 @@ export function validateData(): void {
     }
   }
 
-  // Every cascade child must exist.
+  // Every cascade child must exist (either as a real skill or as a
+  // characteristic name, which the engine treats as a stat-bump child).
+  const CHAR_NAMES = new Set(["Str", "Dex", "End", "Int", "Edu", "Soc"]);
   for (const skill of allSkills()) {
     if (skill.isCascade && skill.cascadeOptions) {
       for (const child of skill.cascadeOptions) {
-        if (!SKILL_REGISTRY.has(child)) {
+        if (!SKILL_REGISTRY.has(child) && !CHAR_NAMES.has(child)) {
           throw new Error(
             `Cascade skill "${skill.id}" references unknown child "${child}"`,
           );

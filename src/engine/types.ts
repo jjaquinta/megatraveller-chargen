@@ -193,6 +193,9 @@ export interface CareerDef {
   bypassesHomeworldSkillLimits: boolean; // true for Noble only
   anagathicsSurvivalDm: number; // -1 normally, -2 for Noble
 
+  /** If true, a successful reenlistment throw is mandatory — no choice to leave. */
+  mandatoryReenlistOnSuccess?: boolean;
+
   /** Optional draftable slot (1–6 on the draft die). */
   draftSlot?: number;
 }
