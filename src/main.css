@@ -1,3 +1,221 @@
-/* Intentionally minimal — visual design happens when we build the wizard. */
-html, body, #root { height: 100%; margin: 0; }
-body { font-family: system-ui, sans-serif; line-height: 1.4; }
+/* MegaTraveller chargen — minimal light theme. Sized for utility, not polish. */
+
+:root {
+  --bg: #fafaf7;
+  --surface: #ffffff;
+  --border: #d8d4cc;
+  --border-strong: #b5b0a4;
+  --text: #1f1f1c;
+  --text-muted: #6a6760;
+  --accent: #2b5f9c;
+  --accent-strong: #1f4470;
+  --danger: #a33;
+  --warning: #b78a00;
+  --success: #2c7a3e;
+  --code-bg: #f1efe9;
+  --radius: 4px;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+h1, h2, h3 {
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+}
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+p { margin: 0 0 0.6rem; }
+small, .muted { color: var(--text-muted); }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+button {
+  font: inherit;
+  padding: 0.4rem 0.9rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+button:hover { background: var(--code-bg); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+button.primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent-strong);
+}
+button.primary:hover { background: var(--accent-strong); }
+button.danger { color: var(--danger); border-color: var(--danger); }
+button.danger:hover { background: #fbeaea; }
+
+input[type="text"], input[type="number"], textarea, select {
+  font: inherit;
+  padding: 0.3rem 0.5rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 100%;
+  box-sizing: border-box;
+}
+input:focus, textarea:focus, select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: var(--accent);
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.row > * { min-width: 0; }
+.spacer { flex: 1; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.list-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 0.4rem;
+}
+.list-row.clickable { cursor: pointer; }
+.list-row.clickable:hover { background: var(--code-bg); }
+.list-row .primary-text { font-weight: 500; }
+.list-row .meta { color: var(--text-muted); font-size: 0.9em; }
+.list-row .actions { display: flex; gap: 0.4rem; }
+
+.tag {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.8em;
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  color: var(--text-muted);
+  margin-right: 0.4rem;
+}
+.tag.done { background: #e3f0e6; color: var(--success); }
+.tag.in-progress { background: #fff3da; color: var(--warning); }
+
+.upp-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+.upp-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: stretch;
+}
+.upp-cell label {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  text-align: center;
+}
+.upp-cell input { text-align: center; }
+
+.upp-display {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.3em;
+  letter-spacing: 0.1em;
+  background: var(--code-bg);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius);
+  display: inline-block;
+}
+
+.skill-row, .possession-row {
+  display: grid;
+  grid-template-columns: 1fr 80px auto;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.3rem;
+}
+.skill-row input[type="number"], .possession-row input[type="number"] { text-align: right; }
+
+.log {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  max-height: 320px;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  white-space: pre-wrap;
+}
+.log-entry { margin-bottom: 0.2rem; }
+.log-entry .term-label {
+  color: var(--text-muted);
+  margin-right: 0.5rem;
+}
+
+.error {
+  background: #fbeaea;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.75rem;
+}
+.notice {
+  background: #fff3da;
+  color: var(--warning);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.75rem;
+}
+
+dialog {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 1rem;
+  max-width: 480px;
+  background: var(--surface);
+  color: var(--text);
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.3); }
+dialog textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
